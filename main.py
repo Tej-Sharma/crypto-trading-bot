@@ -4,11 +4,15 @@ import smtplib, ssl
 import requests
 from time import time, sleep
 
+# NOTE: All prices are in USD
+
+
 # Parameters to determine whether the coin
 # matches our tracking criteria
-RUN_EVERY_SECONDS = 1800 # 60seconds * 30mins
+RUN_EVERY_SECONDS = 61 # 60seconds * 30mins
+MIN_MARKET_CAP = 1000000
 MAX_MARKET_CAP = 2000000000
-HOURLY_PERCENTAGE_INCREASE_NEEDED = 10
+HOURLY_PERCENTAGE_INCREASE_NEEDED = 7
 EXCHANGE_PRICE_PERCENTAGE_DIFFERENCE = 10
 
 # FOR SENDING EMAILS
@@ -34,34 +38,91 @@ def get_trackable_coins_from_coins_list(pages=30, coins_per_page=250):
     return trackable_coins
 
 def filter_coins_for_arbitrage(coins):
-    for coin_id in coins:
+    MAX_COINS = 3
+    result = []
+    for coin_id in coins[0:MAX_COINS]:
         coin_data = cg.get_coin_by_id(id=coin_id)
+        coin_market_cap = float(coin_data['market_data']['market_cap']['usd'])
+        coin_symbol = coin_data['symbol'].lower()
+        print(coin_id)
+        if True:
+        # if coin_market_cap >= MIN_MARKET_CAP and coin_market_cap <= MAX_MARKET_CAP:
+        #         # and coin_data['market_data']['price_change_percentage_1h_in_currency']['usd'] > HOURLY_PERCENTAGE_INCREASE_NEEDED:
+            binance_price = -1
+            binance_identifier = ''
+            lowest_dex_price = float('inf')
+            lowest_dex_identifier = ''
+            lowest_dex_trade_pair = ''
+            highest_dex_price = float('-inf')
+            highest_dex_identifier = ''
+            highest_dex_trade_pair = ''
+            for ticker_data in coin_data['tickers']:
+                # Update binance price if found
+                if 'binance' in ticker_data['market']['name'].lower() and ticker_data['target'] == 'USD':
+                    binance_price = ticker_data['converted_last']['usd']
+                    binance_identifier = ticker_data['market']['identifier']
+                elif 'swap' in ticker_data['market']['name'].lower():
+                    ticker_price = ticker_data['converted_last']['usd']
+                    if ticker_price < lowest_dex_price:
+                        lowest_dex_price = ticker_price
+                        lowest_dex_identifier = ticker_data['market']['identifier']
+                        lowest_dex_trade_pair = ticker_data['target'] if ticker_data['base'].lower() == coin_symbol else \
+                            ticker_data['base']
+                    if ticker_price > highest_dex_price:
+                        highest_dex_price = ticker_price
+                        highest_dex_identifier = ticker_data['market']['identifier']
+                        highest_dex_trade_pair = ticker_data['target'] if ticker_data['base'].lower() == coin_symbol else \
+                            ticker_data['base']
+            if binance_price == -1 or lowest_dex_price == float('inf'): continue
+            print('Lowest dex price: ' + str(lowest_dex_price))
+            print('Dex identifier: ' + str(lowest_dex_identifier))
+            print('Trade pair: ' + lowest_dex_trade_pair)
+            print('Binance price: ' + str(binance_price))
+            print('Highest dex price: ' + str(highest_dex_price))
+            print('Dex identifier: ' + str(highest_dex_identifier))
+            print('Trade pair: ' + highest_dex_trade_pair)
+            if (abs(lowest_dex_price - binance_price) / binance_price) * 100 > EXCHANGE_PRICE_PERCENTAGE_DIFFERENCE:
+                result.append({
+                    'coin_id': coin_id,
+                    'binance_price': binance_price,
+                    'dex_price': lowest_dex_price,
+                    'dex_identifier': lowest_dex_identifier,
+                    'binance_identifier': binance_identifier
+                })
+            if (abs(highest_dex_price - binance_price) / binance_price) * 100 > EXCHANGE_PRICE_PERCENTAGE_DIFFERENCE:
+                result.append({
+                    'coin_id': coin_id,
+                    'binance_price': binance_price,
+                    'dex_price': highest_dex_price,
+                    'dex_identifier': highest_dex_identifier,
+                    'binance_identifier': binance_identifier
+                })
+    return result
 
-def get_binance_filtered_coins(numb_pages=20):
+
+def get_binance_filtered_coins(numb_pages=6):
     all_coins = []
     for i in range(numb_pages):
         coins = cg.get_exchanges_tickers_by_id(id='binance', page=i)['tickers']
         for coin in coins:
-            coin_market_cap = coin['converted_last']['usd'] * coin['converted_volume']['usd']
-            if coin_market_cap <= MAX_MARKET_CAP:
-                all_coins.append(coin['coin_id'])
+            all_coins.append(coin['coin_id'])
     return all_coins
 
-def sendEmailWithCoinData(coins):
-    message = ''
-
-    binance_coins = getBinanceCoins()
-
-    # check if any of the coins are in binance coins
-    for coin in coins:
-        if coin['id'] in binance_coins:
-            message = 'BINANCE COIN: ' + message + str(coin['id']) + ' ' + str(coin['symbol']) + ' ' \
-                      + str(coin['price_change_percentage_1h_in_currency']) + '\n'
-    # build the message
-    for coin in coins:
-        message = message + str(coin['id']) + ' ' + str(coin['symbol']) + ' ' + str(coin['name']) + ' --- ' + str(coin['price_change_percentage_1h_in_currency'])  + '\n'
-
-    send_email(message)
+# def sendEmailWithCoinData(coins):
+#     message = ''
+#
+#     binance_coins = getBinanceCoins()
+#
+#     # check if any of the coins are in binance coins
+#     for coin in coins:
+#         if coin['id'] in binance_coins:
+#             message = 'BINANCE COIN: ' + message + str(coin['id']) + ' ' + str(coin['symbol']) + ' ' \
+#                       + str(coin['price_change_percentage_1h_in_currency']) + '\n'
+#     # build the message
+#     for coin in coins:
+#         message = message + str(coin['id']) + ' ' + str(coin['symbol']) + ' ' + str(coin['name']) + ' --- ' + str(coin['price_change_percentage_1h_in_currency'])  + '\n'
+#
+#     send_email(message)
 
 def send_email(message):
     send_result = requests.post(
@@ -100,9 +161,15 @@ def print_historical_market_chart_data(data):
         volume_data = data['total_volumes'][i][1]
         print(str(ts) + " | " + str(price_data) + " | " + str(market_cap_data) + " | " + str(volume_data))
 
+SLEEP_TIME_BETWEEN_BINANCE_AND_ANALYSIS = 61
 def execute_algorithm():
+    # Get binance filtered coins
     filtered_binance_coins = get_binance_filtered_coins()
-    sendEmailWithCoinData(filtered_binance_coins)
+    print(filtered_binance_coins)
+    # sleep(SLEEP_TIME_BETWEEN_BINANCE_AND_ANALYSIS)
+    arbitraged_coins = filter_coins_for_arbitrage(filtered_binance_coins)
+    print(arbitraged_coins)
+    # sendEmailWithCoinData(filtered_binance_coins)
 
 if __name__ == '__main__':
     # while True:
