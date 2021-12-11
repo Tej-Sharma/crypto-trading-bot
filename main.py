@@ -149,7 +149,6 @@ def send_email(message):
 
 def sendEmailWithCoinData(coins):
     message = ''
-    coins_parsed = []
     # Convert coins to formatted string
     for coin in coins:
         message = message + 'COIN_ID: ' + str(coin['coin_id']) + ' | Binance Price: ' + str(coin['binance_price']) \
