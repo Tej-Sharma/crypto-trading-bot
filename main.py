@@ -74,14 +74,6 @@ def filter_coins_for_arbitrage(coins):
                         highest_dex_identifier = ticker_data['market']['identifier']
                         highest_dex_trade_pair = ticker_data['target'] + ' ' + ticker_data['base']
             if binance_price == -1 or lowest_dex_price == float('inf') or lowest_dex_price == 0: continue
-            # print(coin_data)
-            # print('Lowest dex price: ' + str(lowest_dex_price))
-            # print('Dex identifier: ' + str(lowest_dex_identifier))
-            # print('Trade pair: ' + lowest_dex_trade_pair)
-            # print('Binance price: ' + str(binance_price))
-            # print('Highest dex price: ' + str(highest_dex_price))
-            # print('Dex identifier: ' + str(highest_dex_identifier))
-            # print('Trade pair: ' + highest_dex_trade_pair)
             if (abs(lowest_dex_price - binance_price) / lowest_dex_price) * 100 > EXCHANGE_PRICE_PERCENTAGE_DIFFERENCE:
                 result.append({
                     'coin_id': coin_id,
@@ -92,7 +84,8 @@ def filter_coins_for_arbitrage(coins):
                     'binance_pair': binance_trade_pair,
                     'lowest_dex_trade_pair': lowest_dex_trade_pair
                 })
-            if (abs(highest_dex_price - binance_price) / binance_price) * 100 > EXCHANGE_PRICE_PERCENTAGE_DIFFERENCE:
+            elif (abs(highest_dex_price - binance_price) / binance_price) * 100 > EXCHANGE_PRICE_PERCENTAGE_DIFFERENCE\
+                    and lowest_dex_identifier != highest_dex_identifier:
                 result.append({
                     'coin_id': coin_id,
                     'binance_price': binance_price,
@@ -156,6 +149,7 @@ def send_email(message):
 
 def sendEmailWithCoinData(coins):
     message = ''
+    coins_parsed = []
     # Convert coins to formatted string
     for coin in coins:
         message = message + 'COIN_ID: ' + str(coin['coin_id']) + ' | Binance Price: ' + str(coin['binance_price']) \
@@ -167,7 +161,8 @@ SLEEP_TIME_BETWEEN_BINANCE_AND_ANALYSIS = 70
 def execute_algorithm(coins):
     arbitraged_coins = filter_coins_for_arbitrage(coins)
     print(arbitraged_coins)
-    if len(arbitraged_coins) > 0: sendEmailWithCoinData(arbitraged_coins)
+    if len(arbitraged_coins) > 0:
+        sendEmailWithCoinData(arbitraged_coins)
 
 if __name__ == '__main__':
     coins = read_in_filtered_coins_from_file()
