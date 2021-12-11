@@ -37,6 +37,19 @@ def get_trackable_coins_from_coins_list(pages=30, coins_per_page=250):
                 trackable_coins.append(coin)
     return trackable_coins
 
+def check_ticker_is_valid_trade_pair(ticker_data):
+    '''
+    :param ticker_data: The ticker data for an exchange in a coin
+    :return: True if the target or base is an acceptable pair
+    '''
+    ACCEPTABLE_PAIRS = ['USDT', 'USDC', 'ETH']
+    target = ticker_data['target']
+    base = ticker_data['base']
+    if target in ACCEPTABLE_PAIRS or base in ACCEPTABLE_PAIRS:
+        return True
+    else:
+        return False
+
 def filter_coins_for_arbitrage(coins):
     TIME_TO_WAIT_PER_COINS_PER_BATCH = 80
     MAX_COINS_PER_BATCH = 40
@@ -58,8 +71,9 @@ def filter_coins_for_arbitrage(coins):
             highest_dex_identifier = ''
             highest_dex_trade_pair = ''
             for ticker_data in coin_data['tickers']:
+                if not check_ticker_is_valid_trade_pair(ticker_data): continue
                 # Update binance price if found
-                if 'binance' in ticker_data['market']['name'].lower():
+                if 'binance' == ticker_data['market']['name'].lower():
                     binance_price = ticker_data['converted_last']['usd']
                     binance_identifier = ticker_data['market']['identifier']
                     binance_trade_pair = ticker_data['target'] + ' ' + ticker_data['base']
