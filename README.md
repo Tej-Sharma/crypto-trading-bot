@@ -1,4 +1,4 @@
-## Arbiter of Crypto
+## Crypto Trading Bot
 
 A crypto trading bot that uses the strategy of arbitrage to *attempt* to make a profit.
 
